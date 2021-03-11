@@ -1,0 +1,58 @@
+ITERATORS
+---------
+
+This document contains brief notes, summaries if you like, of core iterator concepts, it is 
+not a full book on everything to do with iterators. For more information see the references.
+
+The directory contains a set of individually compiler tests and experiments I made when playing
+around with iterators. I keep them here since maybe they will be useful for me later.
+
+BASIC CONCEPT
+-------------
+
+An iterator is a conceptual object type used to traverse the elements of a collection. The
+idea is that all iterators use a common interface allowing any collection to be traversed in
+a common way.
+
+The C++ standard library implements iterators via the template duck typing system, thus the
+iterator interface is more like an iterator specification that a type must conform to.
+
+However the iterator specification is actually a specification for multiple types of iterators
+each of which have different operations that can be performed on them as well as different
+guarantees/properties regarding those operations.
+
+Further there are utilities around iterators which make their use more convenient. All in all
+the important concepts of iterators are:
+
+  - iterator categories (types of iterator)
+  - auxillary iterator functions
+  - iterator adapters
+  - iterator traits
+
+briefly...
+
+Iterator categories include: output iterators, input iterators, forward iterators, bidirectional
+iterators, random access iterators and contiguous iterator. The last one there being a c++20
+addition which is not covered in ref[0]...TODO: learn that one.
+
+Auxillary functions are convenience functions for iterators to make a few use cases easier and
+the code more elegant. They apparantly also provide functionality to some iterator categories
+that normally only random access iterators have; need to look into that.
+
+Iterator adaptors are types which modify (i.e. adapt) existing iterator categories to behave in
+some usefully alternative manner. These include: reverse iterator adaptors, insert iterator
+adaptors and stream iterator adaptors.
+
+Iterator traits allow for inspection of type data regarding an iterator, the point of which is
+to make it possible to write generic code for iterators. This is done via the template 
+iterator_traits. Basically iterator traits is a struct template which defines the set of types
+an iterator must define to be used by generic algorithms in the STL. It is a core part of the
+iterator interface. This used to be done (deprecated in C++17) with std::iterator, see ref[1]
+for why it was deprecated and why std::iterator_traits is better.
+
+That is about all there is to know about iterators, excluding all the details of course :)
+
+REFERENCES
+----------
+[0] The C++ Standard Library 2nd Edition by Nicolai M. Josuttis Chapter 9
+[1] https://www.fluentcpp.com/2018/05/08/std-iterator-deprecated/
