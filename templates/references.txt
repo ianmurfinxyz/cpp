@@ -1,0 +1,14 @@
+----------
+REFERENCES
+----------
+
+The following is a list of sources, in no particular order, which I found useful when learning 
+about c++ templates.
+
+BOOKS
+-----
+[0] The C++ Programming Language 4th Edition by Bjarne Stroustrup
+
+SITES
+-----
+[0] https://www.fluentcpp.com/2018/05/08/std-iterator-deprecated/

@@ -32,8 +32,25 @@ the important concepts of iterators are:
 briefly...
 
 Iterator categories include: output iterators, input iterators, forward iterators, bidirectional
-iterators, random access iterators and contiguous iterator. The last one there being a c++20
-addition which is not covered in ref[0]...TODO: learn that one.
+iterators, random access iterators and contiguous iterators. The last one there being a c++20
+addition which is not covered in ref[0] (TODO: learn that one). However its not as complicated
+as it first appears as most of these categories are essentially derviations of others; the
+heirarchy is:
+
+  input  <-- forward <-- bidirectional <-- random access
+  output
+
+...yes output iterators are not directly derived from, however there is a special type of
+forward iterator called a mutable forward iterator that is a type of output iterator. However
+these derivations are specification derivations rather than type derivations since the iterators
+categories are not classes, they are specifications for what iterator classes must contain (as
+templates are duck typed).
+   |
+   V
+Actually output iterators may infact be derived from, I have read sources which say they are
+not and other which say they are!? However what is clear is that forward iterators, 
+bidirectional iterators and random access iterators (unless constant) can be written to. Are
+these the special case of mutable forward iterators? TODO: clear this confusion up!
 
 Auxillary functions are convenience functions for iterators to make a few use cases easier and
 the code more elegant. They apparantly also provide functionality to some iterator categories
@@ -42,6 +59,24 @@ that normally only random access iterators have; need to look into that.
 Iterator adaptors are types which modify (i.e. adapt) existing iterator categories to behave in
 some usefully alternative manner. These include: reverse iterator adaptors, insert iterator
 adaptors and stream iterator adaptors.
+    |
+    | WRONG!
+    V
+I misunderstood what an iterator adaptor is! They do not modify existing iterators (which I 
+thought because the reverse iterator adaptor modifies their member iterators behaviour) but
+rather they modify (adapt) the behaviour of the STL algorithms. How? The STL algorithms all
+operate directly on the iterator interface, which is a 'pure abstraction' (i.e. a duck typed
+one); the adaptors adapt the iterator interface to do different things so the algorithms,
+operating on the iterator interface do different things. A nice example is with the 
+ostream_iterator iterator adaptor which can be used to adapt, for example, the std::copy 
+algorithm to write to the std::cout. See file output_it.cpp for full details. Source [2] 
+succinctly states this as:
+
+    "Iterators are pure abstractions: Anything that behaves like an iterator is an iterator. For 
+    this reason, you can write classes that have the interface of iterators but do something 
+    (completely) different. The C++ standard library provides several predefined special 
+    iterators: iterator adapters. They are more than auxiliary classes; they give the whole 
+    concept a lot more power."
 
 Iterator traits allow for inspection of type data regarding an iterator, the point of which is
 to make it possible to write generic code for iterators. This is done via the template 
@@ -52,7 +87,43 @@ for why it was deprecated and why std::iterator_traits is better.
 
 That is about all there is to know about iterators, excluding all the details of course :)
 
+ON IMPLEMENTING CUSTOM ITERATORS
+--------------------------------
+
+STL containers only actually return a single type of iterator; their own custom type which
+implements a single iterator category specification. They do not return multiple different
+iterators within multiple categories.
+
+Because the iterator specification is a duck-typed template specification you implement your
+own iterators, not by deriving from some std:: class, but by simply adding the members defined
+within the specification to a new custom type of iterator specifically designed to understand
+how to traverse your new container, like
+
+class MyUniqueIterator
+{
+public:
+  using iterator_category = std::random_access_iterator_tag;
+  
+  ...
+};
+
+You then tell the STL algorithms which iterator category specification your iterator conforms
+to by adding the alias iterator_category as a member alias to your new iterator type. This
+member alias is used by the STL to select the most optimal version of algorithms for your
+new container type. Note that all checks are done by the compiler not at runtime.
+
+STL algorithms will then attempt to use your iterator by assuming it has all members defined
+by the specification of its iterator_category, if it doesn't a compile time error occurs as
+the compiler will detect that the STL algorithms you are using are trying to access members
+which your iterator hasn't got (this is the compiler time duck typing nature of C++ templates).
+
+The STL container specification states that containers should return their custom iterator
+type via the member functions: begin(), end(), cbegin(), cend(), rbegin(), rend(), rcbegin()
+and rcend(). Note that the returned reverse iterators are actually not a second type of 
+iterator you must implement but rather an iterator adaptor wrapping your single custom iterator.
+
 REFERENCES
 ----------
 [0] The C++ Standard Library 2nd Edition by Nicolai M. Josuttis Chapter 9
 [1] https://www.fluentcpp.com/2018/05/08/std-iterator-deprecated/
+[2] http://www.ccplusplus.com/2014/01/iterator-adaptor-c.html

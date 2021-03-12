@@ -1,0 +1,311 @@
+----------------
+C++ DUCK TYPING!
+----------------
+
+In chapter 24 - Generic Programming - P700 - BOOK[0] - Stroustup states:
+
+"The type checking provided for templates checks the use of arguments in the template
+definition rather than against an explicit interface (in a template decleration). This provides
+a compile-time variant of what is often called duck typing ... we operate on values, and the
+presence and meaning of an operation depends solely on its operand values."
+
+Reading this sparked my curiosity and I want to understand it better; I am writing this document 
+with such an aim.
+
+
+Python Ducks
+------------
+
+In a duck typed language like python variables are not regions of memory with an associated
+type which defines how that memory region is to be used, rather variables are handles/references
+to immutable objects maintained by the python interpreter. This allows the same handle (i.e. 
+variable) to refer to any object at any time, for example,
+
+x = 10          # handle to an immutable integer
+x = 'hello'     # handle to an immutable string
+x = Thing()     # handle to an immutable Thing instance (is it immutable?)
+
+Thus if we write an algorithm such as the accumulate algorithm like,
+
+def accumulate(collection):
+  sum = 0
+  for element in collection:
+    sum += element
+  return sum
+
+this implementation is a generic implementation that can operate on upon any collection
+which contains elements that support the += operation.
+
+Now of course this is crap code since my summation is an int and not a value_type of the
+collection but I cant remember how to do such a thing in python and this code makes the
+point clear enough :)
+
+Thus,
+
+x = [10, 20, 30, 40]
+print(accumulate(x))    # prints 100
+x = 10
+print(accumulate(x))    # throws runtime exception since int object is not iterable
+
+What is happening here is that at runtime (since there is only a runtime with python)
+the interpreter will parse the code and attempt to perform all required operations on the 
+objects passed as arguments to the accumulate algorithm. If the object supports the required
+operations then the function succeeds, if it does not the function throws an exception.
+
+
+C++ Missing Ducks
+-----------------
+
+In C++  variables represent program objects (regions of memory that can hold a value) with an 
+associated type. The type imposes requirements on the values which can be assigned to the 
+program objects as well as the operations that can be performed on the object, and all type 
+checking is performed by the compiler before the code is executed.
+
+Thus in C++ (without templates) to write the accumulate algorithm you would have to write
+it for each type which the algorithm can be performed on. Such as:
+
+double accumulate(const double* array_collection, int n){
+  double sum {};
+  for(int i = 0; i < n; ++i)
+    sum += array_collection[i];
+  return sum;
+}
+
+and
+
+double accumulate(const std::vector<double>& collection){
+  double sum{}
+  for(auto element : collection)
+    sum += element;
+  return sum;
+}
+
+and so on.
+
+This is required because the compiler must check that the types used support the required 
+operations and values.
+
+C++ Found Ducks
+---------------
+
+Templates are clearly used to overcome the limitation of not being able to write generic 
+algorithms due to the compilers requirement to perform static type checking.
+
+In chapter 24 - Generic Programming - P700 - BOOK[0] - Stroustup states:
+
+"There are many definitions of "generic programming". Thus the term can be confusing. However,
+in the context of C++, "generic programming" implies an emphasis on the design of general 
+algorithms implemented using templates."
+
+To cut to the chase, It appears that function templates are like duck typed functions in which
+the parameters of said functions are types, other templates and values. 
+
+Thus regular functions take program objects as arguments and the compiler checks the type of
+the object at compile time to ensure it conforms to the requirements which the function places
+upon the type, or to put another way, to ensure the function conforms to the properties of the
+type.
+
+Template functions take types, other templates and values, and the compiler treats the function
+as a duck typed function. It does not check that the arguments to the template are valid, i.e.
+that they are used according to some specification, instead it runs the template, constructing 
+a regular function from it, and then performs the normal checking on the regular function.
+
+This can be seen by considering a basic template function,
+
+template<typename iter, typename val>
+val accumulate(iter first, iter last)
+{
+  val sum{};
+  while(first != last){
+    sum = sum + *first;
+    ++first;
+  }
+  return sum;
+}
+
+The 'iter' and 'val' are not defined to have a specific type, thus the line,
+
+template<typename iter, typename val>
+
+is like a python function,
+
+def template(iter, val)   # what type is iter and val ??
+
+In python you could consider there to be no program objects and only values (immutable objects
+with variables being handles the objects/values) and thus a function attempts to run and will
+either succeed or fail.
+
+In the C++ template function the arguments have no types, thus the compiler will attempt to
+run the template function and if the arguments (the program object types) support the operations
+the template attempts to perform on them it succeeds, else it fails.
+
+Thus a template function like,
+
+template<typename iter>
+iter::value_type accumulate(iter first, iter last)
+{
+  iter::value_type sum{};
+  while(first != last){
+    sum = sum + *first;
+    ++first;
+  }
+  return sum;
+}
+
+imposes upon its argument that it must be a type which has a value_type member; the compiler
+will run the template function with whatever type you pass as an argument, and it will either
+fail and throw a compilation error, or it will succeed and output a new concrete function.
+
+Another example:
+
+template<class T>
+void printClassName(const T& t)
+{
+  t.printName();
+}
+
+In this case the template requires a type argument which has a printName member which is 
+callable.
+
+Finally it is worth noting that the C++ duck typing is compilation time duck typing, thus if
+the duck doesn't quack a compilation error is thrown rather than a runtime error, and thus the
+duck typing imposes no overhead. Pretty cool! :)
+
+ADDENDUM: 
+
+This duck typing is really important when implementing the STL algorithm functions
+as it allows the use of general iterators within generic algorithms implemented via templates.
+
+It does this in the manner shown in the above example; using type alias in the iterator
+definition like,
+
+class MyIterator
+{
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = int;
+    using difference_type = int;
+    using pointer = int*;
+    using reference = int&;
+
+    // ...
+
+This allows generic algorithms to get access to the underlying type being iterated from the
+iterator. Since templates use duck typing the templates will work on any iterator type which
+contains a value_type member alias.
+
+This above example is from SITE[0] which talks about how the system of providing algorithms
+with iterator type information has changed from C++11 to C++17, worth a good read.
+
+ADDENUM 2: Breakdown of the initial quote:
+
+"The type checking provided for templates checks the use of arguments in the template
+definition rather than against an explicit interface (in a template decleration). This provides
+a compile-time variant of what is often called duck typing ... we operate on values, and the
+presence and meaning of an operation depends solely on its operand values."
+
+          |
+          | the breakdown
+          |
+          V
+
+"checks the use of arguments in the template definition rather than against an explicit interface"
+
+i.e. it checks the argument to the template can be used in the manner it is attempted to be used
+within the definition, rather than checking the argument is of a particular type, i.e. it has
+a particular interface.
+
+Regular functions check their arguments are of a particular type, i.e. conform to a particular
+interface, thus,
+
+int sum(int a, int b){
+  return a + b;
+}
+float x {1.f};
+float y {2.f};
+sum(x, y);     // error
+
+this fails because the compiler checks the arguments against an explicit interface , i.e.
+that the arguments are ints, which they are not. If the compiler instead checked that the
+arguments could be used in the manner the definition requires, it would not fail since floats
+also support the binary + operator. This would be duck typing.
+
+Templates thus use the duck typing check whereas concrete functions use the interface check.
+
+Hence template arguments do not have types like functions arguments in python, whereas regular
+function arguments do have types.
+
+Okay this was the last addendum as I fear I am labouring the point :)
+
+..
+
+I LIED!
+
+ADDENDUM 3:
+
+    ___
+  /     \
+  |  o  |
+   \ | /
+    |||
+    ===
+     = 
+
+The STL defines 'C++ named requirements' specifications which the types used within template
+functions must respect. These are effectively interfaces for which the arguments (i.e. data 
+types) to the duck typed template functions must implement for them to be used by those duck
+typed templates.
+
+So for example the std::for_each algorithm states within the cppreference wiki page that the
+types passed to the template function std::for_each must meet the requirements of:
+
+Type requirements
+-InputIt must meet the requirements of LegacyInputIterator.
+-ForwardIt must meet the requirements of LegacyForwardIterator.
+-UnaryFunction must meet the requirements of MoveConstructible. Does not have to be CopyConstructible
+-UnaryFunction2 must meet the requirements of CopyConstructible.
+
+where std::for_each is declared as:
+
+template< class InputIt, class UnaryFunction >
+UnaryFunction for_each( InputIt first, InputIt last, UnaryFunction f );
+(until C++20)
+
+template< class InputIt, class UnaryFunction >
+constexpr UnaryFunction for_each( InputIt first, InputIt last, UnaryFunction f );
+(since C++20)
+
+template< class ExecutionPolicy, class ForwardIt, class UnaryFunction2 >
+void for_each( ExecutionPolicy&& policy, ForwardIt first, ForwardIt last, UnaryFunction2 f );
+(since C++17)
+
+https://en.cppreference.com/w/cpp/algorithm/for_each
+
+This is revelatory to me, I previously had no idea what the cppreference was talking about with
+the name requirements. Now I do, eureka! 
+
+Further I really like this system of specification. I found coding in python frustrating because
+I would write a function which took arguments which were expected to have a specific interface 
+and have no way of formally specifying that interface or enforcing it. At least in the STL case
+the interface is formally specified.
+
+The full set of named requirements that the C++ standard library is written to can be found
+here,
+    https://en.cppreference.com/w/cpp/named_req
+
+It is interesting to note that C++20 is adding the 'concepts' feature which is designed to
+provide a way to enforce these named requirements on your types. Currently if you pass a type
+to a STL template function, the compiler will attempt to generate the concrete function for
+your type but fail because your type does not meet the required named requirements and thus
+the duck typing fails effecively. The problem is that although the compiler catches these 
+errors the error messages it spits out are very complex and hard to decifer. This is stated on
+the named requirements page linked above as:
+
+The named requirements listed on this page are the named requirements used in the normative text of the C++ standard to define the expectations of the standard library.
+
+    "Some of these requirements are being formalized in C++20 using the concepts language 
+    feature. Until then, the burden is on the programmer to ensure that library templates are 
+    instantiated with template arguments that satisfy these requirements. Failure to do so may 
+    result in very complex compiler diagnostics."
+
+
