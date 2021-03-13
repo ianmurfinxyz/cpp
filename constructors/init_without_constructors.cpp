@@ -7,7 +7,7 @@
 //   https://en.cppreference.com/w/cpp/container/array
 // where it states the constructors, destructors and operator= are 'implicitly declared'.
 //
-// Thus std::array relies on:
+// Thus std::array relies on:    (see P489 section 17.3.1 of Bjarne Book 4th Edition)
 //
 //  - default initialization (i.e. without an initializer or with an EMPTY initializer list).
 //  - memberwise initialization

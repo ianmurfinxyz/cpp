@@ -224,6 +224,9 @@ int sum(int a, int b){
 float x {1.f};
 float y {2.f};
 sum(x, y);     // error
+                    ^------okay not really since the compiler will allow the implicit conversion, 
+                           but lets pretend it doesn't for the sake of me not having to think
+                           of a better example :)
 
 this fails because the compiler checks the arguments against an explicit interface , i.e.
 that the arguments are ints, which they are not. If the compiler instead checked that the
