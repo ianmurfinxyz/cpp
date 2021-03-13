@@ -1,0 +1,199 @@
+ARGUMENT DEDUCTION
+------------------
+
+This file is a set of notes compiled from reading The C++ Programming Language by Bjarne
+Stroustrup. All pages and section references in this file are w.r.t said book.
+
+FUNCTION TEMPLATE ARGUMENT DEDUCTION
+------------------------------------
+
+For function templates, the arguments to the template can be deduced (determined by reasoning
+or deduction) from the arguments to a call of a specialisation of that template. For example,
+
+template<typename T>
+T max(T a, T b)
+{
+  return a > b ? a : b;
+}
+
+max(2, 3);      // deduced to be max<int>
+max(2.0, 3.0);  // deduced to be max<double>
+max(2.f, 3.f);  // deduced to be max<float>
+
+so you do not need to explicitly specialise the function like, 
+
+max<int>(2, 3);
+max<double>(2.0, 3.0);
+max<float>(2.f, 3.f);
+
+although you can if you like, as the following example shows,
+
+#include <iostream>
+
+template<typename T>
+T max(T a, T b) 
+{ 
+  std::cout << "is_int=" << std::is_same<T, int>::value << std::endl;
+  std::cout << "is_float=" << std::is_same<T, float>::value << std::endl;
+  std::cout << "is_double=" << std::is_same<T, double>::value << std::endl;
+  return a > b ? a : b; 
+}
+
+int main()
+{
+  std::cout << max(2, 3) << std::endl;               // selects max<int>
+  std::cout << max(2.f, 3.f) << std::endl;           // selects max<float>
+  std::cout << max(2.0, 3.0) << std::endl;           // selects max<double>
+  std::cout << max<int>(2, 3) << std::endl;          // selects max<int>
+  std::cout << max<float>(2.f, 3.f) << std::endl;    // selects max<float>
+  std::cout << max<double>(2.0, 3.0) << std::endl;   // selects max<double>
+}
+
+CLASS TEMPLATE ARGUMENT DEDUCTION
+---------------------------------
+
+...is not a thing. The C++ standard does not allow the arguments to a class constructor to be
+used to deduce the template arguments of a class. On page 686 Bjarne states the reason for this
+as being,
+
+"Note that class template parameters are never deduced. The reason is that the flexibility 
+provided by several constructors for a class wouldl make such deduction impossible in many
+cases and obscure in many more."
+
+Can I think of any examples where this is true? How about this one...
+
+template<typename T1, typename T2, typename T3>
+class triple
+{
+public:
+  triple(T1 a, T2 b, T3 c);
+  triple(T1 a, T2 b);         // this will only compile if T1 == T2 == T3 is false since
+  triple(T1 a, T3 c);         // otherwise you will have 3 constructors which take the same args.
+  triple(T2 b, T3 c);
+  T1 a_;
+  T2 b_;
+  T3 c_;
+};
+
+// which constructor to call? thus which T is the int, which is the double and what is the 
+// type of the T not mentioned? This deduction is not possible.
+triple t0 {1, 2.0}; 
+
+// instead must be explicit.
+triple<int, float, double>(1, 2.f);
+
+note: have tested the above example and yes, it will not compile if use all the same type like,
+
+triple<int, int, int> t0 {1,2,3};
+
+outputs error saying you cannot overload the constructor, as expected.
+
+ENTER THE MAKE FUNCTION PATTERN
+-------------------------------
+
+In order to be able to deduce class arguments the standard library makes use of make_type 
+functions like make_pair and make_unique. The idea here is to wrap the construction of a class
+in a function so the class template types can be deduced via the function args, like this,
+
+template<typename T1, typename T2>
+pair<T1, T2> make_pair(T1 a, T2 b)
+{
+  return {a, b};
+}
+
+in this example the arguments to the pair are deduced from the function arguments. I implemented
+this pattern for my triple class...
+
+#include <iostream>
+
+template<typename T1, typename T2, typename T3>
+class triple
+{
+public:
+  triple(T1 a, T2 b, T3 c) :
+    a_{a}, b_{b}, c_{c}{}
+  triple(T1 a, T2 b) :
+    a_{a}, b_{b}, c_{T3{}}{}
+  triple(T1 a, T3 c) :
+    a_{a}, b_{T2{}}, c_{c}{}
+  triple(T2 b, T3 c) :
+    a_{T1{}}, b_{b}, c_{c}{}
+
+  friend std::ostream& operator<<(std::ostream& os, const triple& t)
+  { os << "{" << t.a_ << "," << t.b_ << "," << t.c_ << "}"; return os;}
+
+  T1 a_;
+  T2 b_;
+  T3 c_;
+};
+
+//
+// You can use a wrapper function to deduce the args for a class template provided the
+// constructor takes all the args, as too does the function.
+//
+template<typename T1, typename T2, typename T3>
+triple<T1, T2, T3> make_triple_c0(T1 a, T2 b, T3 c)
+{
+  return {a, b, c};
+}
+
+//
+// this doesn't really work cleanly since you have to provide an unused arg in each so the
+// type can be deduced, but which arg is unused is hidden in the implementation, thus the user
+// would have no clue which triple member would be default constructed. You would have to make
+// this explicit in the naming which is ugly as sin! Thus bad design...don't ever do this.
+//
+template<typename T1, typename T2, typename T3>
+triple<T1, T2, T3> make_triple_c1(T1 a, T2 b, T3 c)
+{
+  return triple<T1, T2, T3>{a, b};
+}
+template<typename T1, typename T2, typename T3>
+triple<T1, T2, T3> make_triple_c2(T1 a, T2 b, T3 c)
+{
+  return triple<T1, T2, T3>{a, c};
+}
+template<typename T1, typename T2, typename T3>
+triple<T1, T2, T3> make_triple_c3(T1 a, T2 b, T3 c)
+{
+  return triple<T1, T2, T3>{b, c};
+}
+
+int main()
+{
+  //triple t0 {1, 2.f, 3.0}; // error: missing template arguments before 't0'
+  //triple<int, int, int> t1{1, 2, 3}; // error: cannot overload constructors
+  //triple<int, float, int> t1{1, 2.f, 1}; // compiles
+  
+  auto c0 = make_triple_c0(1, 2.0, 3.f);
+
+  // these will compile but yikes!
+  auto c1 = make_triple_c1(1, 2.0, 3.f); 
+  auto c2 = make_triple_c2(1, 2.0, 3.f); 
+  auto c3 = make_triple_c3(1, 2.0, 3.f); 
+
+  std::cout << "c0=" << c0 << std::endl;
+  std::cout << "c1=" << c1 << std::endl;
+  std::cout << "c2=" << c2 << std::endl;
+  std::cout << "c3=" << c3 << std::endl;
+}
+
+WHEN DEDUCTION IS NOT POSSIBLE
+------------------------------
+
+In some cases, such as when a function takes no arguments, template argument deduction is not
+possible. The example Bjarne gives on P686 is,
+
+/* Cannot deduce the type of T from a call to create since create does not take any args. It
+ * does however return a type T, this type T thus needs to be known.
+ */
+template<typename T>
+T* create();
+
+int* p = create<int>();  // explicit specialisation with T=int
+int* q = create();       // error: cant deduce template argument
+
+interesetingly Bjarne points out that this syntax (of explicit specification) is the same as for 
+casts like static_cast<T>() and dynamic_cast<T>(), but does not say exactly why. Am I to assume
+it is because such casts are implemented as template functions? Or are they a different thing
+just made to look that way?

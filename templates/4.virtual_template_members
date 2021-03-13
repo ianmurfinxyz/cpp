@@ -1,0 +1,21 @@
+VIRTUAL TEMPLATE MEMBER FUNCTIONS
+---------------------------------
+
+On P679 section 23.4.6.2 Bjarne points out that a template class cannot have templated virtual
+member functions like,
+
+class Shape {
+
+  /* pure virtual template member function.
+   *
+   */
+  template<typename T>
+    virtual bool interesect(const T&) const = 0;
+
+};
+
+such a thing is not allowed because it would mean adding a new interesect function for every
+time you called interesect with a new argument type. Which Bjarne states would make the
+implementation of Linkers unacceptably complicated.
+
+Another thing worth remembering.

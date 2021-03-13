@@ -1,0 +1,14 @@
+
+A template can take 3 types of parameters:
+  
+  - type parameters
+  - value parameters
+  - template parameters
+
+Templates can take a fixed number of parameters or variable parameters if a variadic
+template.
+
+Short all cap names are common for template parameters because they have very limited
+scope (to that of the template) and it is desirable to avoid name conflicts. Note that
+should be wary to avoid conflicts with macro names which tend to be long all cap names.
+

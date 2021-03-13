@@ -1,0 +1,30 @@
+DEFAULT CONSTRUCTORS IN TEMPLATE CLASSES
+----------------------------------------
+
+On page 679 section 23.4.6.1 BOOK[0] Bjarne explains that for template classes which have
+templated constructors, those templates will never be used to generate the copy constructor,
+move constructor or copy/move assignments.
+
+"For technical reasons, a template constructor is never used to generate a copy constructor...
+, copy assignments, move constructors, and move assignments"
+
+Meaning if I have a template class like,
+
+template<typename T>
+class Vector
+{
+  T x_, y_;
+
+public:
+  template<typename U>
+    Vector(const Vector<U>& v) : x_{v.x_}, y_{v.y}{}
+};      ^
+        |
+    this member template will never be used to generate the a copy constructor so the a
+    copy constructor has effectively not been declared. In this case a default one will
+    be added anyway.
+
+To ensure a template class has a copy/move constructor/assignment you must add non-template
+version of these; they will never be generated from templates.
+
+It is worth remembering this.

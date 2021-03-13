@@ -1,0 +1,88 @@
+TEMPLATE SPECIALIZATION
+-----------------------
+
+The point of this document is to present an overview of the broad concepts regarding template
+specialization. The other .cpp files in this directory test out some of the finer details.
+
+Once again these notes are the product of reading BOOK[0].
+
+SO WHAT IS SPECIALIZATION?
+--------------------------
+
+Fundamentally a specialization is just an instance of a template for a given set of arguments.
+However this specialization can be created either by the compiler or by the programmer. When
+the programmer specializes a template it is called a user-define specialization.
+
+The point of user defined specialization being a thing, is to allow the programmer to define
+different versions of templates for different types or for different subsets of types. This
+allows these more specific templates to be created which are more suited to the specific types
+for which it is specialized. It is essentially overloading a template.
+
+Bjarne distinguishes between 'interface spetializations' and 'implementation spetializations', 
+where the former changes the interface of some class template and the latter changes the
+implementation of a class template or function template, for example changing the implementation
+of an algorithm for a subset of types of a specific type to a form more efficient for those
+types (see sections 25.3.1 and 25.3.1.1).
+
+With regard to specializations there are 3 types of template:
+
+  1. Primary templates
+  2. Partial specializations
+  3. Full specializations
+
+these are listed in the order of most generic to least. So,
+
+  - the primary template applies to all types
+  - partial specializations apply to a subset of types (where the subset has size > 1)
+  - full specializations apply to a single type
+
+Bjarne gives a good example of a partial specialization in section 25.3 P730 of a vector
+to a general pointer (i.e. a specialization of some template vector class for all pointer
+types). In this example said partial specialization inherits from a full specialization of
+the primary template for void pointers. This is to avoid a new template being instantiated
+for every different pointer type (to reduce a major source of code bloat in OOP code). See
+the book for details.
+
+Importantly, and intuitively, Bjarne states,
+
+"The most specialized version will be preferred over the others in declerations of objects, 
+pointers, etc. "
+
+GNU std::array header example
+-----------------------------
+
+The following code is from the GNU implementation of the std::array header, source:
+  https://code.woboq.org/gcc/libstdc++-v3/include/std/array.html
+
+This is an example of a partial specialization.
+
+template<typename _Tp, std::size_t _Nm>
+    struct __array_traits
+    {
+      typedef _Tp _Type[_Nm];
+      typedef __is_swappable<_Tp> _Is_swappable;
+      typedef __is_nothrow_swappable<_Tp> _Is_nothrow_swappable;
+      static constexpr _Tp&
+      _S_ref(const _Type& __t, std::size_t __n) noexcept
+      { return const_cast<_Tp&>(__t[__n]); }
+      static constexpr _Tp*
+      _S_ptr(const _Type& __t) noexcept
+      { return const_cast<_Tp*>(__t); }
+    };
+ template<typename _Tp>     // note how the partial takes 1 less template arg
+   struct __array_traits<_Tp, 0>  // the 2nd template arg in the partial is the value 0
+   {
+     struct _Type { };
+     typedef true_type _Is_swappable;
+     typedef true_type _Is_nothrow_swappable;
+     static constexpr _Tp&
+     _S_ref(const _Type&, std::size_t) noexcept
+     { return *static_cast<_Tp*>(nullptr); }
+     static constexpr _Tp*
+     _S_ptr(const _Type&) noexcept
+     { return nullptr; }
+   };
+
+this specialization handles the unique case where the size of the array is 0. Which it does
+by replacing the array of types _Tp[_Nm] with an empty struct and returning nullptr for the 
+accessors.
