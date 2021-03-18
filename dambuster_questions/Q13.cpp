@@ -9,7 +9,7 @@ void skinCharacter(vert *out, vert* in, u32 numVerts)
   vert *input = allocateFromCache(HALF_CACHE_SIZE);
   vert *output = allocateFromCache(HALF_CACHE_SIZE);
   while(numVerts){
-    u32 = MIN(numVerts, HALF_CACHE_SIZE/sizeof(vert));
+    u32 n = MIN(numVerts, HALF_CACHE_SIZE/sizeof(vert));
     TransferHandle h = streamIntoCache(input, in, n*sizeof(vert));
     streamWaitForTransfer(h);
     for(int i {0}; i < n; ++i){
