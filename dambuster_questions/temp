@@ -1,0 +1,7 @@
+Q6.cpp: In function ‘int main()’:
+Q6.cpp:131:23: error: use of deleted function ‘String& String::operator=(String&&)’
+  131 |   str1 = function(str1);
+      |                       ^
+Q6.cpp:69:11: note: declared here
+   69 |   String& operator=(String&&) = delete;
+      |           ^~~~~~~~
