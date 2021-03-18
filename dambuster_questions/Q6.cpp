@@ -194,4 +194,39 @@ int main()
 // Q6.cpp:69:11: note: declared here
 //    69 |   String& operator=(String&&) = delete;
 //      |           ^~~~~~~~
+// 
+// Ah WHY?!
+//
+// The answer I found here: 
+//   https://stackoverflow.com/questions/23000243/c-deleted-move-assignment-operator-compilation-issues
+//
+// Basically the line, 
+//
+//   String& operator=(String&&) = delete;
+//
+// is actually a decleration of the move assignment, thus with that line I am telling the compiler
+// that my class has a move assignment...then I am telling it that it is deleted and attempted
+// use of it is an error.
+//
+// This is different to simply not declaring the line, not doing so tells the compiler that
+// the class does not have a move assignment, so the compiler will use the copy assignment
+// instead.
+//
+// I thus misunderstood what the = delete meant. I thought it was simply used to prevent a 
+// default move assignment being created. Thus by adding the line or not adding the line I was
+// thinking it would not make a difference. Thus my mental model was wrong. 
+//
+// In conclusion, explicitly deleting a move assignment is used to prevent the class being used
+// in assignment opertions in which the compiler would select the move assignment as the most 
+// appropriate assignment function. Thus the compiler will create an error upon any such attempt.
+//
+// Whereas, simply not adding a move assignment, means when the compiler chooses which assignment
+// function to call within an assignment operation, assuming the compiler determined that the
+// move assignment was the best option, it will see the class has no move assignment and instead
+// choose the copy assignment.
+//
+// So, short summary,
+//
+//  String& operator=(String&&) != 
+//                                        ^-- i.e. nothing :)
 //
