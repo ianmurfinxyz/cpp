@@ -1,0 +1,193 @@
+
+references
+----------
+http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p0709r0.pdf
+https://stackoverflow.com/questions/27368641/does-disabling-support-for-exceptions-also-disable-support-for-stdmove-if-noe
+https://seanmiddleditch.com/keep-disabling-exceptions/
+https://www.reddit.com/r/programming/comments/6s2izd/johnathan_blow_on_criticizing_engineering_and_c/
+https://pkisensee.wordpress.com/2007/01/04/c-exception-handling-in-games-guidelines/
+https://abseil.io/docs/cpp/guides/status
+https://stackoverflow.com/questions/810839/throwing-exceptions-from-constructors
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html
+https://stackoverflow.com/questions/7249378/disabling-c-exceptions-how-can-i-make-any-std-throw-immediately-terminate
+https://stackoverflow.com/questions/173618/is-there-a-portable-equivalent-to-debugbreak-debugbreak
+https://www.youtube.com/watch?v=GC4cp4U2f2E
+
+Types of Error
+--------------
+
+There are essentially 2 types of errors:
+    1 - programmer errors (should never happen errors)
+    2 - io/user errors (may happen so must handle them appropriately)
+
+Examples of 1 are:
+  nullptr dereference, out of range mem access, use after free
+
+examples of 2 are:
+  file not found, cannot convert from string, cannot find key in map
+
+You could also divide these into unrecovarable errors (1) and recovarable errors (2). The best
+approach to unrecovrable errors is to catch them, log them, and crash. For 2 you want a more
+graceful approach that allows the program to continue.
+
+The first category are programmer errors which should never happen and should be dealth with
+by fixing them before release. They can be detected with an assertion system like the one in
+the godot engine:
+  https://github.com/godotengine/godot/blob/master/core/error/error_macros.h
+
+This file contains a suite of macros that handle different programming errors (out of bounds
+indices, nullptr deref, general conditional asserts, and forcing a crash) as well as 
+logging each error to a common log when they occur. Thus used throughout the code this system
+can be used to easily check and find programmer errors. Note that that is what it should be
+used for only, it should not be used to catch user errors. Well actually...
+
+godot does use the system to report on io errors in the bmp image loader module, (line 56)
+https://github.com/godotengine/godot/blob/master/modules/bmp/image_loader_bmp.cpp
+
+the macro chosen however simply logs the error and then returns an error value to the caller,
+thus it is not really an assert, it doesn't crash the program.
+
+Thus godot uses this error system as both an assert system and a way of reporting errors to 
+the caller, hence why some of the macros take a return value; the value to return upon error.
+
+A tricky business
+-----------------
+
+In general there are only 2 sources of errors; inside the code, or from outside the code. The 
+former are essentially once again programmer errors, and the latter are io/user errors.
+
+Error handling is complicated because there is no silver bullet as to what to do when you
+encounter an error. You essentially have 3 options:
+
+  1) handle the error there and then (in the function that detected it).
+  2) crash the program.
+  3) return an error code to the caller in the hope that they can handle it.
+
+note: errors occur when a functions preconditions were not met and thus it cannot satisfy its
+postconditions. This may be nullptrs passed as args, invalid indices as args, etc. Or it could
+be that some system level error occured that is not in the code (to repeat myself).
+
+Handling the error there and then is rare since in most cases a function is not aware of the
+context of the caller and so cannot handle the error.
+
+Crashing the program is fine for unrecovarable errors but not for recoverable once.
+
+returning an error to the caller is the general approach for recoverable errors but it has the
+problem of bloating the code with lots of error handling code, obfuscating code by potentially
+mixing the 'happy' with the 'error' path, consuming the return value for the error code rather
+than the product of the function, the potential that the caller cannot handle it and thus has
+to propogate the error further up the stack, the obscurity of error codes (descriptive error
+strings are better), etc.
+
+Exceptions were designed to:
+  - allow errors that happen in one function to propagate up the stack to where they can be
+  handled, and if they cant be (so they are unrecoverable) then crashing the program.
+
+  - allowing them to carry error string messages (accessed via the member what()) thus not
+  be obscure like error codes
+
+  - seperating out the error handling code from the happy path with a seperate catch block
+
+  - not consuming the return value of the function (thus seperating the error handling path from
+  the normal path completely)
+
+The problem with them is that they require the compiler to insert code into every stack frame
+to handle the possibility of exceptions being thrown and correctly calling dtors of local objects
+when they are. They also take orders of magnitude more machine cycles to process (when unwinding
+the stack) than simply return error codes. Thus they have a lot of overhead when they are thrown.
+
+There are other criticisms of exceptions too which I should further articulate and explore.
+
+See this talk for a good overview of errors,
+ https://www.youtube.com/watch?v=GC4cp4U2f2E
+
+note on the stl
+---------------
+
+The stdlib uses exceptions as part of its design, in fact it uses exceptions to report on some
+recoverable errors, for example to the std::stoi function will throw std::invalid_argument if
+it cannot convert the string. This means that if I don't want to use exceptions then I cannot
+use this std function as it has no way to report recoverable errors other than with exceptions.
+If I thus use -fno-exceptions as a compile flag then I cannot catch these exceptions and all
+recoverable errors will just crash the program.
+
+note: -fno-exceptions only prevents your code from throwing and catching exceptions, it does
+not strip the exceptions from the stdlib unless you compile that lib with -fno-exceptions. The
+stdlib when used is a library that you link against of course. Even though a lot of it is a 
+template library there are bits that are compiled and you link against. Thus those compiled bits
+are compiled with exceptions enabled.
+
+For example if I compile the code,
+
+--- file: main.cpp ---
+int main()
+{
+  std::string s {"hello"};
+  int n = std::stoi(s);    // will throw std::invalid_argument
+  std::cout << n << std::endl;
+}
+----------------------
+
+with,
+  g++ main.cpp -o test -g -fno-exceptions
+
+it will compile fine, but running it will still cause the program to terminate because an
+unhandled exception occured.
+
+-- running ./test ----
+terminate called after throwing an instance of 'std::invalid_argument'
+  what():  stoi
+----------------------
+
+thus the stdlib std::stio is still throwing exceptions even though I compiled my code with
+-fno-exceptions because I didnt compile the stdlib with -fno-exceptions.
+
+The overall point is that disabling exceptions effectively means you cannot use the stdlib
+because you cannot handle any errors since exceptions are used by the stdlib as the standard
+way to report on all errors.
+
+Q: are there any parts of the stdlib which do return error codes?
+
+Thus engines like godot roll there own containers library which does not use exceptions.
+
+General mechanisms for error handling overview
+----------------------------------------------
+
+2 types of errors:
+  1. unrecoverable programmer errors - log error (function, file, line, timestamp etc) and crash
+  2. recoverable errors like io errors - log error, return value to caller
+
+That is basically it. Thus if you don't use exceptions you have to be careful not to use any
+libraries which use exceptions to report on recoverable errors (like the stdlib) since you 
+will not be able to catch them.
+
+So to handle errors without exceptions you want:
+
+  - a good logging system
+  - an assertion system to catch and log programmer errors and crash or trap into the debugger
+  - a systematic way of returning error codes and checking them like this,
+        https://abseil.io/docs/cpp/guides/status
+
+note that handling errors is not systematic and should be done in whatever way is most appropriate,
+so in a game engine, you may want to handle errors in asset files by replacing them with dummy
+assets that are easy to spot (and logging the error too of course).
+
+the godot engine has a good logging system and assertion system, but it doesn't seem to return
+any systematic error codes, rather just returns bools and ints and so as needed. It does have
+some 'Error' thing that is returned like in the bmp module again,
+    https://github.com/godotengine/godot/blob/master/modules/bmp/image_loader_bmp.cpp
+
+the function,
+
+ v--- what type is this?
+Error ImageLoaderBMP::convert_to_image(Ref<Image> p_image,
+		const uint8_t *p_buffer,
+		const uint8_t *p_color_buffer,
+		const uint32_t color_table_size,
+		const bmp_header_s &p_header) 
+{ ... }
+
+this could be the systematic way of returning errors from functions to the caller but I cannot
+find where Error is defined in the source, and thus cannot find what it actually is. Should
+further search for this as it will answer some more questions as to what method godot uses
+for this end (as an example of what I could do).

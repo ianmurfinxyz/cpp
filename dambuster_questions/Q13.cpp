@@ -85,4 +85,46 @@ void someFunction()
 }
 
 
+void skinCharacter(vert *out, vert* in, u32 numVerts)
+{
+ vert *inputBackground = allocateFromCache(QUARTER_CACHE_SIZE);
+ vert *outputBackground = allocateFromCache(QUARTER_CACHE_SIZE);
+ vert *inputAlive = allocateFromCache(QUARTER_CACHE_SIZE);
+ vert *outputAlive = allocateFromCache(QUARTER_CACHE_SIZE);
+
+  while(numVerts){
+    //start background transfer for next round
+    hInputBackground = streamIntoCache(out, output, n * sizeof(vert));
+
+    //wait for currently needed transfers
+    streamWaitForTransfer(hInputAlive);
+    streamWaitForTransfer(hOutputAlive);
+  
+    //use them
+    for(int i {0}; i < n; ++i)
+      skinVertex(&outputAlive[i], &inputAlive[i]);
+  
+    //wait for background transfers
+    streamWaitForTransfer(hInputBackground);
+    streamWaitForTransfer(hOutputBackground);
+  
+    //swap all
+    swap(hInputBackground,hInputAlive);
+  
+    //...spwap als the rest
+    //start background transfers
+    hOutputBackground = streamOutOfCache(out, output, n * sizeof(vert));
+    hInputBackground = streamIntoCache(out, output, n * sizeof(vert));
+  }
+}
+
+
+
+
+
+
+
+
+
+
 

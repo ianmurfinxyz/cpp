@@ -1,0 +1,23 @@
+A subtle bug can occur when overloading operator new which was pointed out to me by John Valko on FB,
+
+John Valko
+
+"
+You can overload new in a way that doesn't throw, however you have to be careful. If you write 
+code like:
+
+Foo* foo = new Foo;
+if (!foo) { /* oops */ }
+
+There's a subtle bug here. Because the standard says new *must* throw (unless you call nothrow 
+new) the compiler won't insert a check before calling foo's constructor on the result, meaning 
+if it returns nullptr you're going to get a call to Foo::Foo() with this == nullptr.. as you 
+can imagine that may not go well. In gcc you have to pass -fcheck-new to get it to insert the check.
+
+Handling out of memory scenarios is hard. And modern operating systems can make it harder. Like 
+what I was mentioning on Linux, you will actually be allowed to allocate more memory than is 
+actually available, so new/malloc will succeed even if you don't have memory. That's done on the 
+chance that 1) You'll never actually use all of it, or 2) By the time you do that memory has 
+become available. Because of that, you'd be unlikely to ever see new/malloc fail, but you'll 
+just be killed in an OOM situation. I can't speak to the behavior on other systems.
+"
