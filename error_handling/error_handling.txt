@@ -1,0 +1,355 @@
+--------------------------------------------------------------------------------------------------
+file: error_handling.txt
+brief: A summary document in which I articulate what I have learn't about error handling over
+a couple days of research. The target audience of this document is me. But read if like :)
+--------------------------------------------------------------------------------------------------
+
+-----------------
+WHAT IS AN ERROR?
+-----------------
+
+An error is simply anything that can go wrong. However there are fundamentally only two types 
+of errors:
+
+  1. Errors in the code itself, often called programmer errors.
+  2. Errors that result from external factors outside the code, often called user errors.
+
+It tends to be that the former are unrecoverable errors because they result due to logic
+errors in the code that leave the program in an undefined or unkown state. These are errors
+that if the programmer had not made a mistake should never happen. Examples are nullptr
+dereferences, out-of-bounds memory accesses, accessing heap memory that has been freed, or
+just violating logical assumptions made by some block of code.
+
+The latter are errors that the code itself cannot control and thus the programmer has no
+control over if and when they occur. These are errors caused by the user of the program making
+a mistake and tend to be recoverable; a well designed program should handle these errors
+gracefully so the program is not finicky or brittle to use. Examples are missing files, user 
+input strings which cannot be parsed due to formatting errors, failure to find a key in a map,
+game assets being in an unsupported format, a player of a game trying to something they can't 
+like load their gun when they have no ammo etc.
+
+-------------------------------------------
+WHERE DO ERRORS OCCUR AND WHAT CAN BE DONE?
+-------------------------------------------
+
+It is worth pointing out that since all code is executed as part of some function, then errors
+can only occur within a function. This trivial fact means that when an error occurs, the function
+in which it occurs has two choices:
+
+  1. It handles the error itself (locally).
+  2. It returns the error to the caller in the hope the caller can handle it.
+
+If a function chooses the former it can either immedietly terminate the program or it can 
+resolve the error (fix it).
+
+If the function chooses the latter it must employ some mechanism to inform the calling function
+(or some function above it in the call stack) of the details of the error.
+
+In all cases a logging system could be employed to dump detailed error messages.
+
+The choice a function should make depends on the type of error and the context in which the
+function is to be used. If the error is recoverable and can be handled locally the function can
+choose to do that. However it is mostly the case that the function itself is incapable of
+resolving the error, both recoverable and unrecoverable, and so must inform the caller. Further
+note that exactly what errors are recoverable and unrecoverable the function itself may not even
+be able to detect, as it will depend on the program in which the function is used. Thus in 
+general any error that cannot be resolved locally must be returned to the caller.
+
+So, for example, if you are writing a function that converts a string to an integer, a potential
+error is that the input string cannot be converted (the functions postconditions cannot be met
+due to a violation of its preconditions; that it must recieve a convertable string). The function
+must identify this error and choose what to do about it.
+
+If said function is to be part a library, it cannot know if the program is capable of recovering
+from this error. Maybe the integer to be extracted is non-critical and can be substituted for
+another value, or maybe it is life and death for the program, and failure to convert the string
+means immediete termination. The library function however cannot know. Hence it would be unwise
+for our function to terminate the program. Thus in a library function all errors that occur
+that cannot be handled locally should be returned to the caller.
+
+However if instead the string to int function is to be used specifically in a single context,
+i.e. it is part of the program in which it is to be used, then it can be written to handle the
+error in the way most appropriate to the program, i.e. in a non-general specific way. Thus it may
+choose to terminate the program.
+
+The key takeaway here is that all errors occur in functions and that when they do occur a function
+can only either handle the error itself or return it to the caller. The choice is dependent on
+the type of error and the context in which the function is to be used. Thus there is no silver
+bullet, one strategy fits all, approach. This creates complexity inherent to error handling.
+Inevitably this complexity leads to different strategies employed in seperately developed code
+which leads to more complexity.
+
+---------------------------------------
+MECHANISMS TO HANDLE PROGRAMMING ERRORS
+---------------------------------------
+
+Programming errors are in the "this should never happen" category and result from the programmer
+making a mistake. The best strategy for handling these errors is to catch them and fix them to
+ensure zero of this type of error makes it to release.
+
+Thus the best mechanism to employ here is a detailed logging system to inform the programmer
+(not the end user) of the details of the error, the if, why and when, and then to immedietly
+terminate the program or trap into the debuffer, via an assertion system.
+
+Why terminate? Because these errors mean the program is in an unexpected state and thus "all 
+bets are off" as to what the program may do next. Thus it is best to abort so the program does
+not cause any damage to the system.
+
+I particularly like the assertion system used by the godot engine (ref[11]) since it is easy
+to understand, logs detailed error messages, and has a macro for every possible error. It 
+seems to cover all the bases. Further this system doubles up to help in handling some user
+errors too by logging information about them and returning values to the caller.
+
+It is worth noting that programming errors tend to be easier to deal with than user errors, 
+since they are in control of you the programmer. You are in control of what programming errors
+you write code to detect and how correct you write your code will determine if these errors
+occur and to what extent. In contrast to user errors, where you cannot possibly imagine all the
+miriad of ways a user may try to break your program, yet you need to handle them all gracefully.
+
+--------------------------------
+MECHANISMS TO HANDLE USER ERRORS
+--------------------------------
+
+User errors are in the "these may happen but we prefer it if they didn't, but we need to be
+prepared if they do" category. The best strategy for these errors is to catch them and either
+fix them locally or return details of the error to the caller in the hope the caller can fix
+them. By 'fix', I mean either genuinely 'fix' or work around it.
+
+A distinction should be made here between fixing the error, and informing the caller of the 
+error. The word 'handling' is often used for both since it can apply to both depending on which
+function we are talking about. If function A detects an error and returns it to the caller, say
+function B, we could say A has handled the error. Then when B recieves the error and fixes it
+we could also say B has handled the error. I make this distinction only to point out that there
+is no general mechanisms to fix errors since that is always context specific. There are however
+general mechanisms to inform the caller of errors. This section only talks about the latter, not
+the former.
+
+All mechanisms of informing the caller of an error of course involve sending data about the 
+error up the call stack. They differ only in how that data is sent. Traditionally we have had
+the following mechanisms:
+
+  1. Return a boolean,
+        bool do_something(...){...}
+
+     We return a single boolean to the caller with one state meaning an error occured and the 
+     other meaning it didn't.
+
+  2. Return an integer.
+        int do_something(...){...}
+
+     We return an integer where different values signal different errors.
+
+  3. Return some invalid value and set a global value,
+        FILE *fopn(const char *pathname, const char *mode);
+
+     This example is the posix function to open a file. If it fails it returns NULL and sets
+     the global variable errno. 
+
+  4. Use an out parameter,
+        void do_something(..., int& errno){...}
+
+     This is the same as strategy 2 except we use an out parameter to free up the return value.
+
+  5. Exceptions,
+        void do_something(...){
+           // do work
+           // if (error) throw instance_of_exception_type
+        }
+
+     We use the exception system to throw an instance of some class which contains information
+     about our error up the call stack to whatever function (stack frame) above us can handle
+     it.
+
+  6. Use a 'fancy' or 'smart' return type,
+        Error do_something(...){...}
+
+     Here Error could be a pair with a return value and an error state, we know the return
+     value is valid or not depending on the error state. Error could also be a union of an
+     error object and a return value, or some templated type that is similar like std::expected,
+     or std::optional. An example of such a templated return type is the abseil library (ref[5]). 
+     The overall point of this approach is to allow the return value to return both a result and 
+     an error state.
+
+It is important that in all these mechanisms the function which detected the error must return
+the error details whilst leaving the program in a valid state and not leaking resources. Since
+if it doesn't it may of well just immedietly terminated the program. The entire point of 
+returning error details is that the function is hoping the caller can resolve the problem and
+allow the program to continue.
+
+----------------------
+JUDGING EACH MECHANISM
+----------------------
+
+Since there are so many methods of passing errors up the call stack it is worth comparing each
+one. To do this a common criteria should be used to judge them. There is a fantastic talk (ref[10])
+that does just that; this section is a summary of that talk.
+
+The common criteria:
+          
+          score card
+          ----------
+          overhead - happy path              note: happy path = error free path
+          overhead - error path
+          safety
+          noise
+          seperate paths
+          reasonability
+          composability
+          message
+
+I will not score each mechanism and give detailed breakdowns of those scores for each mechanism,
+for that watch ref[10]. Instead I simply want to note the criteria, to better understand what
+a good mechanism for passing error data up the stack is and what makes it good.
+
+1. overhead:
+
+  The overhead is how expensive it is to report the error, i.e. how expensive it is to pass the
+  error data up the call stack. The ideal would be for it be very cheap for both the happy path
+  and the error path.
+
+  In general passing error codes or small error objects up the stack via return codes is cheap,
+  whereas the exception mechanism is expensive due to the machine cycles it takes to unwind the
+  stack and the extract code that must be inserted by the compiler to do so safely (thus bloating
+  the .text segment). However exceptions are only CPU expensive on the error path and have very
+  low overhead for the happy path. The .text bloat however occurs on both paths. A common 
+  criticism of exceptions is that they violate the principle of only paying for what you use, in
+  that the compiler must inserted the extra code in all functions that may throw an exceptions,
+  whether they do or not.
+
+3. safety:
+
+  This is how easy it is as a programmer to make a mistake, such as forgetting to check an error
+  occured. An ideal is that you want the mechanism you use to make it hard to make a mistake, so
+  it acts as an aid in writing robust code.
+
+  Mechanisms such as returning error codes and setting global values make it easy to forget to
+  check error codes, thus making it easy to write brittle code.
+
+  Exceptions make it harder to make mistakes since if you don't handle an error it will terminate
+  the program, thus forcing you to catch all errors which you want to recover from.
+
+  Some of the 'fancy' templated return object systems make use of the attribute [[nodiscard]]
+  which is a compiler attribute that makes the compiler force you as the programmer to capture
+  the return value of a function. Thus making it harder for you to make a mistake.
+
+4. noise:
+
+  This is how syntactically messy (or noisy) your error handling mechanism is. The ideal is to
+  have clean code, so you don't want catching and handling errors to require lots of messy
+  checks and boilerplate code.
+
+5. seperate paths:
+
+  Ideally you want catching and handling errors to be seperate to your happy path so it is
+  easier to read the code. This is about code readability. Interleaving the error path and
+  happy path can make it hard for new readers to figure out what the function is trying to
+  do. This follows the clean code principle of only showing the reader that which they need
+  to know to understand the function.
+      
+6. reasonability:
+
+  similar to seperate paths, you want to be able to see what the code is doing without the
+  error path acting to obfuscate its function.
+
+7. composability:
+
+  The ideal is to be able to compose functions and errors without the error handling itself
+  getting in the way.
+
+8. messages:
+  
+  The ideal is to output detailed information about each error so they are easy to track down
+  and fix.
+
+  Returning basic types like a bool or an int tend to be obscure and provide little information
+  thus making it hard to find exactly what the error is and why it happened.
+
+  Exceptions improve this by carrying a message with them that can be logged. The type of
+  exception also identifies what error happened.
+
+  It is worth considering the target audience of the messages too. Logging technial details of
+  exactly what happened, in what function, on what line, and at what time is useful for the
+  programmer, but not end users. End users would appreciate messages which tell them not the 
+  specifics of what happened but what they can do to fix it. So a message like "disc removed
+  from drive during play" rather than "cannot read __player_data._database._health from
+  drive segment 0x3401039820". 
+
+Because there are so many different approaches to passing error data up the call stack it is 
+inevitable that seperately developed code will use different mechanisms, especially since 
+each mechanism has its pros and cons so some are better suited to different code bases. For
+example exceptions tend to have high CPU overhead (its expensive for the CPU to unwind the 
+stack) and high memory overhead (the compiler has to insert code into every stack frame to
+make unwinding the stack safe to do at any time, e.g ensuring all destructors are called so all
+resources are freed). It is thus wise to use a common strategy in your own code base so as to
+maintain consistency; an adhoc approach is more likely to lead to errors since you have to check
+the errors of different functions in different ways. A common approach means you can get into
+the habbit of checking all errors, it makes the error handling 'safer' in that it makes it is 
+easier for you the programmer to not make a mistake.
+
+-----------------------------------
+THE STANDARD LIBRARY AND EXCEPTIONS
+-----------------------------------
+
+Exceptions are considered the primary error handling strategy within the C++ standard and are 
+thus used as the common mechanism for passing error data up the call stack in the standard 
+library.
+
+This means that if your code base cannot use exceptions then it cannot safely use most of the
+standard library.
+
+For example consider the std::stoi function which converts a string to an integer. Upon failure
+to convert an input string, stoi reports the error to the caller by throwing the exception
+std::invalid_argument. This error is a user error and is potentially recoverable. However if
+your program cannot use exceptions and has disabled them (perhaps with the compilation option
+-fno-exceptions) then you have no mechanism by which to catch this error. The recoverable user
+error has no choice but to propogate to the top of the stack and terminate your program. Thus
+std::stoi cannot be safely used with exceptions disabled.
+
+Further note that compiling your own code with -fno-exceptions does not change the fact that
+the std library will throw exceptions, it simply prevents your own code from catching them. To
+prevent the std library throwing exceptions you must compile the std library itself with the
+option -fno-exceptions and then link against your compiled version. However this doesn't 
+actually achieve anything since all that does is replace all throws with abort() calls, thus
+functions such as stoi still have no choice but to terminate the program for all errors, 
+recoverable or not.
+
+In conclusion, if you want to safely use the standard library you have to enable exceptions,
+unless you restrict yourself to those specific parts that can be safely used without them. Either
+because those parts do not throw, or because if they do, they only throw upon unrecoverable 
+errors and thus it matters not that they terminate the program.
+
+----------
+CONCLUSION
+----------
+
+Handling errors well requires a good strategy from the get go when building a program. Your 
+program should:
+
+  1. Employ a logging system to provide detailed information about all errors, programming and
+     user. This aids the programmer in development.
+
+  2. Employ an assertion system to catch (and log) programming errors so they can be fixed.
+
+  3. Employ a common strategy for passing error data up the call stack within you own code.
+
+  4. Attempt to resolve or work around user errors as much as possible whilst always leaving
+     your program in a valid state and not leaking resources. Logging all user errors is also
+     a good idea.
+
+----------
+REFERENCES
+----------
+
+[0]  http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p0709r0.pdf
+[1]  https://stackoverflow.com/questions/27368641/does-disabling-support-for-exceptions-also-disable-support-for-stdmove-if-noe
+[2]  https://seanmiddleditch.com/keep-disabling-exceptions/
+[3]  https://www.reddit.com/r/programming/comments/6s2izd/johnathan_blow_on_criticizing_engineering_and_c/
+[4]  https://pkisensee.wordpress.com/2007/01/04/c-exception-handling-in-games-guidelines/
+[5]  https://abseil.io/docs/cpp/guides/status
+[6]  https://stackoverflow.com/questions/810839/throwing-exceptions-from-constructors
+[7]  http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html
+[8]  https://stackoverflow.com/questions/7249378/disabling-c-exceptions-how-can-i-make-any-std-throw-immediately-terminate
+[9]  https://stackoverflow.com/questions/173618/is-there-a-portable-equivalent-to-debugbreak-debugbreak
+[10] https://www.youtube.com/watch?v=GC4cp4U2f2E
+[11] https://github.com/godotengine/godot/blob/master/core/error/error_macros.h
+
