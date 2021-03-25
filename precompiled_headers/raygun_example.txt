@@ -1,0 +1,17 @@
+
+Reading the source of a project call Raygun on github I noticed that it was uses std library
+modules such as chrono without including the header explicitly. It turns out it is doing this
+using precompiled headers. 
+
+The file Raygun/pch.h (pch = pre-compiled header I am guessing) is precompiled on this line in
+CMakeLists.txt,
+ https://github.com/W4RH4WK/Raygun/blob/f6be537c835976a9d6cc356ebe187feba6592847/CMakeLists.txt#L63
+
+Info on precompiled headers with CMake,
+  https://cmake.org/cmake/help/git-stage/command/target_precompile_headers.html
+
+The result is that all translation units will ultimately have the header included in them.
+
+The purpose of precompiling is to speed up compilation times.
+
+TODO: test this myself on a project.
