@@ -146,7 +146,7 @@ I verified these conclusions by running an experiment in which I created a large
 which the compiler cannot optimise away, include it in 3 seperate translation units and print
 a different element from the array in a function defined in each. From a common main I then
 call the 3 print functions (see source in cpp/global_constants/duplicate_constexpr_array). 
-Conlusions can be read here [results](duplicate_constexpr_array/results.md).
+Conclusions can be read here [results](duplicate_constexpr_array/results.md).
 
 ## References
 
